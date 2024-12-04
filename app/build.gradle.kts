@@ -40,7 +40,7 @@ android {
 }
 
 dependencies {
-
+    // Core AndroidX libraries
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -49,11 +49,15 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.core.ktx)
+
+    // Material Design
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    implementation(libs.androidx.activity)
+
+    // Layouts and UI
     implementation(libs.androidx.constraintlayout)
+
+    // Testing libraries
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -62,14 +66,16 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    implementation (libs.tutorial.view)
-
+    // Coil for image loading
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
 
-    implementation (libs.android.gif.drawable)
+    // GIF support library (check if AndroidX compatible)
+    implementation(libs.android.gif.drawable)
 
-    implementation (libs.coil.compose)
-    implementation (libs.coil.gif)
-
+    // Splash screen
     implementation(libs.androidx.core.splashscreen)
+
+
+    implementation (libs.text.recognition)
 }
