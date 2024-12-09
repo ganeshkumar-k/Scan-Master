@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-permission android:name="android.permission.CAMERA"/>
 
     <application
         android:allowBackup="true"
@@ -10,28 +14,23 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ScanMaster"
-        tools:targetApi="31">
+        android:theme="@style/Theme.ScanMaster">
 
         <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.SplashScreen">
+            android:theme="@style/Theme.ScanMaster">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- GuideScreen Activity -->
-        <activity
-            android:name=".GuideScreen"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.ScanMaster">
-        </activity>
+        <activity android:name="com.example.scanmaster.screens.LoginActivity"/>
+        <activity android:name="com.example.scanmaster.screens.SignUpActivity"/>
+        <activity android:name="com.example.scanmaster.screens.ForgotPasswordActivity"/>
+
 
     </application>
 

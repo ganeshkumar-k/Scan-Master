@@ -1,80 +1,245 @@
 package com.example.scanmaster
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.size.Size
+import com.example.scanmaster.screens.LoginActivity
 import com.example.scanmaster.ui.theme.ScanMasterTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.io.InputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        installSplashScreen()
-        setContent {
-            ScanMasterTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScreen()
+
+        FirebaseAuth.getInstance()
+
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+        } else {
+            setContent {
+                ScanMasterTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        MainScreen()
+                    }
                 }
             }
         }
     }
 }
 
+@SuppressLint("ServiceCast")
+@Suppress("DEPRECATION")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
+    val context = LocalContext.current
+    var detectedText by remember { mutableStateOf("Captured text content will be displayed here") }
+    var isTextEmpty by remember { mutableStateOf(true) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val extras = result.data?.extras
+            val bitmap = extras?.get("data") as? Bitmap
+            if (bitmap != null) {
+                detectTextUsingML(
+                    bitmap,
+                    onTextDetected = {
+                        detectedText = it
+                        isTextEmpty = it.isEmpty()
+                    },
+                    onFailure = { Toast.makeText(context, "Text detection failed", Toast.LENGTH_SHORT).show() }
+                )
+            }
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let {
+            val bitmap = uriToBitmap(context, uri)
+            if (bitmap != null) {
+                detectTextUsingML(
+                    bitmap,
+                    onTextDetected = {
+                        detectedText = it
+                        isTextEmpty = it.isEmpty()
+                    },
+                    onFailure = { Toast.makeText(context, "Text detection failed", Toast.LENGTH_SHORT).show() }
+                )
+            }
+        }
+    }
+
     Scaffold(
-        bottomBar = { BottomControls() }
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "ScanMaster",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = { showMenu = !showMenu }) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Logout") },
+                            onClick = {
+                                FirebaseAuth.getInstance().signOut()
+                                context.startActivity(Intent(context, LoginActivity::class.java))
+                                (context as? Activity)?.finish()
+                            }
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        },
+        bottomBar = {
+            BottomControls(
+                onEraseClick = {
+                    detectedText = "Captured text content will be displayed here"
+                    isTextEmpty = true
+                },
+                onCopyClick = {
+                    if (!isTextEmpty) {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("Detected Text", detectedText)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Text copied to clipboard", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "No text to copy", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onCameraClick = {
+                    val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                    cameraLauncher.launch(intent)
+                },
+                onGalleryClick = {
+                    galleryLauncher.launch("image/*")
+                }
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-
-            Card(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(600.dp)
-                    .align(Alignment.Center)
+                    .fillMaxSize()
                     .padding(16.dp),
-                shape = RoundedCornerShape(8.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Captured text content will \n be displayed here",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .wrapContentSize(Alignment.Center),
+                    "Capture and Detect Text",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                CapturedTextCard(
+                    text = detectedText,
+                    isEmpty = isTextEmpty
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun CapturedTextCard(text: String, isEmpty: Boolean) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(350.dp)
+            .padding(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isEmpty) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.secondaryContainer
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = text,
                     textAlign = TextAlign.Center,
-                    color = colorResource(id = R.color.lavender_gray)
+                    color = if (isEmpty) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondaryContainer,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier.padding(16.dp)
                 )
             }
         }
@@ -82,56 +247,70 @@ fun MainScreen() {
 }
 
 @Composable
-fun BottomControls() {
+fun BottomControls(
+    onEraseClick: () -> Unit,
+    onCopyClick: () -> Unit,
+    onCameraClick: () -> Unit,
+    onGalleryClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp)
-            .background(colorResource(id = R.color.lavender_gray)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-
-        GifIconButton(
-            gifRes = R.drawable.delete_text,
-            contentDescription = "Erase",
-            iconSize = 200.dp
-        )
-
-        GifIconButton(
-            gifRes = R.drawable.camera_icon,
-            contentDescription = "Camera",
-            iconSize = 200.dp
-        )
-
-        GifIconButton(
-            gifRes = R.drawable.copy_icon,
-            contentDescription = "Copy",
-            iconSize = 45.dp
-        )
+        ControlButton(icon = Icons.Default.Delete, label = "Erase", color = MaterialTheme.colorScheme.error, onClick = onEraseClick)
+        ControlButton(icon = Icons.Default.Add, label = "Camera", color = MaterialTheme.colorScheme.primary, onClick = onCameraClick)
+        ControlButton(icon = Icons.Default.Home, label = "Gallery", color = MaterialTheme.colorScheme.secondary, onClick = onGalleryClick)
+        ControlButton(icon = Icons.Default.Done, label = "Copy", color = MaterialTheme.colorScheme.tertiary, onClick = onCopyClick)
     }
 }
 
 @Composable
-fun GifIconButton(
-    gifRes: Int,
-    contentDescription: String,
-    iconSize: Dp = 40.dp,
-    buttonSize: Dp = 60.dp
-) {
-    Box(
+fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .size(buttonSize),
-        contentAlignment = Alignment.Center
+            .clickable { onClick() }
+            .padding(8.dp)
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(gifRes)
-                .size(Size.ORIGINAL)
-                .build(),
-            contentDescription = contentDescription,
-            modifier = Modifier.size(iconSize)
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = color,
+            modifier = Modifier
+                .size(50.dp)
+                .background(color.copy(alpha = 0.2f), shape = CircleShape)
+                .padding(10.dp)
         )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = color)
     }
 }
 
+fun detectTextUsingML(
+    bitmap: Bitmap,
+    onTextDetected: (String) -> Unit,
+    onFailure: (Exception) -> Unit
+) {
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    val inputImage = InputImage.fromBitmap(bitmap, 0)
+
+    recognizer.process(inputImage)
+        .addOnSuccessListener { visionText ->
+            onTextDetected(visionText.text)
+        }
+        .addOnFailureListener { e ->
+            onFailure(e)
+        }
+}
+
+fun uriToBitmap(context: Context, uri: Uri): Bitmap? {
+    return try {
+        val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+        BitmapFactory.decodeStream(inputStream)
+    } catch (e: Exception) {
+        null
+    }
+}
