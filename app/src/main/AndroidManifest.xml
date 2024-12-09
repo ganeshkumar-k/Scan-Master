@@ -27,6 +27,11 @@
             </intent-filter>
         </activity>
 
+        <activity android:name="com.example.scanmaster.screens.LoginActivity"/>
+        <activity android:name="com.example.scanmaster.screens.SignUpActivity"/>
+        <activity android:name="com.example.scanmaster.screens.ForgotPasswordActivity"/>
+
+
     </application>
 
 </manifest>

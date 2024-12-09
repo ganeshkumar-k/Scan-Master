@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -50,14 +51,13 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // Material Design
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
-    // Layouts and UI
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.firebase.auth.ktx)
+    implementation(libs.firebase.firestore.ktx)
 
-    // Testing libraries
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -66,16 +66,17 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // Coil for image loading
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
 
-    // GIF support library (check if AndroidX compatible)
     implementation(libs.android.gif.drawable)
 
-    // Splash screen
     implementation(libs.androidx.core.splashscreen)
 
 
     implementation (libs.text.recognition)
+
+    
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
 }
